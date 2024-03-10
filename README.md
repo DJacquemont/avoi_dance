@@ -3,6 +3,7 @@ This project demonstrates two iRobot Create-3 robots autonomously navigating wit
 
 ## Requirements
 * [`ROS 2 Humble`](https://docs.ros.org/en/ros2_documentation/humble/) on `Ubuntu 22.04 LTS`
+* [`Gazebo11`](https://classic.gazebosim.org/https://classic.gazebosim.org/)
 * `Python >= 3.10`
 * `C++ >= 17`
 * Submodule [`aws-robomaker-small-house-world`](git@github.com:aws-robotics/aws-robomaker-small-house-world.git)
@@ -17,7 +18,7 @@ This project demonstrates two iRobot Create-3 robots autonomously navigating wit
 * Clone the repo:
     ```bash
     $ cd ~/create3_ws/src
-    $ git clone git@github.com:DJacquemont/avoi_dance.git .
+    $ git clone git@github.com:DJacquemont/avoi_dance.git
     ```
 * Setup the submodules:
     ```bash
@@ -34,6 +35,7 @@ This project demonstrates two iRobot Create-3 robots autonomously navigating wit
 * Run the ROS2 packages and Gazebo simulation:
     ```bash
     $ cd ~/create3_ws
+    $ source install/local_setup.bash
     $ ros2 launch avoi_dance avoi_dance.launch.py
     ```
 

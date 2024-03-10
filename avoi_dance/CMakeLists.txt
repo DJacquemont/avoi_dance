@@ -7,18 +7,19 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-# uncomment the following section in order to fill in
-# further dependencies manually.
 find_package(rclcpp REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(irobot_create_msgs REQUIRED)
+find_package(rclcpp_action REQUIRED)
 
-add_executable(avoi_dance src/avoi_dance.cpp)
-ament_target_dependencies(avoi_dance rclcpp)
-target_include_directories(avoi_dance PUBLIC
+add_executable(robot_nav src/robot_nav.cpp)
+ament_target_dependencies(robot_nav rclcpp nav_msgs irobot_create_msgs rclcpp_action)
+target_include_directories(robot_nav PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
-target_compile_features(avoi_dance PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(robot_nav PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
-install(TARGETS avoi_dance
+install(TARGETS robot_nav
   DESTINATION lib/${PROJECT_NAME})
 
 install(DIRECTORY launch
