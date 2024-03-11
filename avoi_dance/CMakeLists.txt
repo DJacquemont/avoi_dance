@@ -11,9 +11,13 @@ find_package(rclcpp REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(irobot_create_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+
 
 add_executable(robot_nav src/robot_nav.cpp)
-ament_target_dependencies(robot_nav rclcpp nav_msgs irobot_create_msgs rclcpp_action)
+ament_target_dependencies(robot_nav rclcpp nav_msgs irobot_create_msgs geometry_msgs rclcpp_action tf2_geometry_msgs tf2)
 target_include_directories(robot_nav PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
