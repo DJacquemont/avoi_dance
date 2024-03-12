@@ -58,7 +58,7 @@ While working on the project, I encountered several challenges that present oppo
 * Clone the repo:
     ```bash
     $ cd ~/create3_ws/src
-    $ git clone git@github.com:DJacquemont/avoi_dance.git
+    $ git clone git@github.com:DJacquemont/avoi_dance.git .
     ```
 * Setup the submodules:
     ```bash
