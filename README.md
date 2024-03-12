@@ -17,11 +17,11 @@ The system's localization of the robots within the global frame relies exclusive
 
 The algorithm is based on the following steps:
 
-<div style="text-align: center;">
-    <img src="images/algorithm_diagram.png" width="40%">
-    <br>
-    <span>Algorithm High Level Diagram</span>
-</div>
+<p align="center">
+  <img src="images/algorithm_diagram.png" width="40%" />
+  <br>
+  Algorithm High Level Diagram
+</p>
 
 The node subscribes to the odometry data of both robots and calculates the distance between them. If the distance is less than a specified threshold and the robot faces the other robot, the node publishes a command to the robots to steer away. If the robot is outside of the perimeter the node publishes a command to the robot to steer back inside the perimeter. Most of the time, the robots are commanded to randomly move around in perimeter.
 
@@ -33,11 +33,11 @@ While working on the project, I encountered several challenges that present oppo
 * Autonomous behaviors in the behaviors_scheduler.hpp file had to be disabled because they were causing unwanted autonomous actions in the robots. This measure is a temporary fix, and the underlying issue needs to be investigated.
 * To know the exact position of the robots, the /odom topic was used. Unfortunatly, the odometry data is not always accurate, and the robots' positions can drift over time. This issue can be addressed by using a more accurate localization system, such as SLAM or sensor fusion (with GPS sensor data for instance).
 
-<div style="text-align: center;">
-    <img src="images/node_graph.png" width="70%">
-    <br>
-    <span>Node Graph of the Systems</span>
-</div>
+<p align="center">
+  <img src="images/node_graph.png" width="70%" />
+  <br>
+  Node Graph of the Systems
+</p>
 
 ## Setup & Run Instructions
 
