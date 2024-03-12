@@ -26,6 +26,8 @@
 #define M_PI 3.14159265358979323846
 #define LIMIT_X 1.5
 #define LIMIT_Y 1.5
+#define PROB_RIGHT 0.85
+#define PROB_LEFT 0.15
 
 /**
  * @brief Enum class for the robot's behavior state
@@ -167,7 +169,7 @@ private:
 
     /**
      * @brief Select the robot's behavior based on the other robot's position
-     * @details The robot's behavior is based on the other robot's position and orientation
+     * @details The robot's behavior is based on both robot's position and orientation
      * 
      * @return BehaviorState 
      */
@@ -197,12 +199,12 @@ private:
                 }
             } 
             else {
-                // compute a random number between 0 and 1 more based on a random seed_ and more likely to be 1
+                // compute a random number between 0 and 1 more based on a random seed
                 double random_number = (double)rand() / RAND_MAX;
-                if (random_number > 0.75) {
+                if (random_number > PROB_RIGHT) {
                     return BehaviorState::ROTATING_RIGHT;
                 } 
-                else if (random_number < 0.15) {
+                else if (random_number < PROB_LEFT) {
                     return BehaviorState::ROTATING_LEFT;
                 }
                 else {
@@ -215,6 +217,11 @@ private:
             // compute the angle between the two robots
             double angle = atan2(position_other_.y - position_self_.y, position_other_.x - position_self_.x);
             angle = normalize_angle(angle);
+
+            RCLCPP_DEBUG(
+                this->get_logger(),
+                "Angle between the two robots: %f radians",
+                angle);
 
             // compute the angle between the robot's orientation and the angle between the two robots
             double angle_diff = normalize_angle(angle - position_self_.yaw);

@@ -35,9 +35,9 @@ def generate_launch_description():
             # launch_arguments={'x': x_robot_1, 'y': y_robot_1, 'yaw': yaw_robot_1}.items(),
 
             # The algorithm implemented in the avoi_dance node does not properly work in the AWS world because 
-            # the robot is not able to sense its environment, and thus collides with object (appart from the other 
-            # robot which has a known position). A workaround is to use an empty world without any obstacles, 
-            # and only the two robots.
+            # the robot is not able to sense its environment (issues with topics /hazard_detection and /ir_intensity), 
+            # and thus collides with object (appart from the other robot which has a known position). A workaround 
+            # is to use an empty world without any obstacles, and only the two robots.
             
             PythonLaunchDescriptionSource(os.path.join(bringup_dir, 'create3_gazebo.launch.py')),
             launch_arguments={'namespace': 'robot_1', 'spawn_dock': 'false', 'x': x_robot_1, 'y': y_robot_1, 'yaw': yaw_robot_1}.items(),
@@ -72,7 +72,7 @@ def generate_launch_description():
         
         # Timer action to delay the launch of avoi_dance nodes
         TimerAction(
-            period=25.0,
+            period=18.0,
             actions=[
                 Node(
                     package='avoi_dance',
@@ -97,7 +97,7 @@ def generate_launch_description():
         ),
         
         TimerAction(
-            period=25.0,
+            period=18.0,
             actions=[
                 Node(
                     package='avoi_dance',
