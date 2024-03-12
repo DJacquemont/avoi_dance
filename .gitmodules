@@ -1,6 +1,6 @@
 [submodule "create3_sim"]
 	path = create3_sim
-	url = git@github.com:iRobotEducation/create3_sim.git
+	url = git@github.com:DJacquemont/create3_sim.git
 	branch = humble
 [submodule "aws-robomaker-small-house-world"]
 	path = aws-robomaker-small-house-world

@@ -31,7 +31,7 @@ def generate_launch_description():
     # Includes
     world_spawn = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([create3_launch_file]),
-        launch_arguments={'spawn_dock':'false', 'world_path': world_path}.items())
+        launch_arguments={'namespace':'robot_1', 'spawn_dock':'false', 'world_path': world_path}.items())
 
     # Add AWS models to gazebo path
     # This environment variable needs to be set, otherwise code fails
