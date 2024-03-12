@@ -7,7 +7,7 @@ This project demonstrates two iRobot Create-3 robots autonomously navigating wit
 * `Python >= 3.10`
 * `C++ >= 17`
 * Submodule [`aws-robomaker-small-house-world`](git@github.com:aws-robotics/aws-robomaker-small-house-world.git)
-* Submodule [`create3_sim`](git@github.com:iRobotEducation/create3_sim.git)
+* Submodule [`create3_sim`](git@github.com:DJacquemont/create3_sim.git)
 
 ## Setup Instructions
 * Create a workspace:
@@ -38,4 +38,6 @@ This project demonstrates two iRobot Create-3 robots autonomously navigating wit
     $ source install/local_setup.bash
     $ ros2 launch avoi_dance avoi_dance.launch.py
     ```
+
+
 

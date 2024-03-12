@@ -1,16 +1,31 @@
-#include <rclcpp/rclcpp.hpp>
-#include <rclcpp_action/rclcpp_action.hpp>
-#include <irobot_create_msgs/action/rotate_angle.hpp>
-#include <nav_msgs/msg/odometry.hpp>
-#include <irobot_create_msgs/msg/hazard_detection_vector.hpp>
-#include <tf2/LinearMath/Quaternion.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp> 
-#include <geometry_msgs/msg/twist.hpp>
+/**
+ * @file robot_nav.cpp
+ * @author Dimitri JACQUEMONT (jacquemont.dim@gmail.com)
+ * @brief This file contains the implementation of the RobotNav class.
+ * @details This class is used to control the autonomous navigation of 
+ *          the robot and the avoidance of the other robot.
+ * 
+ * @version 2
+ * @date 2024-03-12 
+ */
+
+
 #include <cstdlib>
 #include <ctime>
 #include <memory>
 
+#include <geometry_msgs/msg/twist.hpp>
+#include <irobot_create_msgs/action/rotate_angle.hpp>
+#include <irobot_create_msgs/msg/hazard_detection_vector.hpp>
+#include <nav_msgs/msg/odometry.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <rclcpp_action/rclcpp_action.hpp>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+
 #define M_PI 3.14159265358979323846
+#define LIMIT_X 1.5
+#define LIMIT_Y 1.5
 
 /**
  * @brief Enum class for the robot's behavior state
@@ -18,7 +33,8 @@
  */
 enum class BehaviorState {
     IDLE,
-    ROTATING,
+    ROTATING_RIGHT,
+    ROTATING_LEFT,
     FORWARD
 };
 
@@ -28,12 +44,17 @@ enum class BehaviorState {
  */
 class RobotNav : public rclcpp::Node {
 public:
+    struct Position {
+        double x;
+        double y;
+        double yaw;
+    };
     RobotNav() : Node("robot_nav") {
 
         // Declare all necessary parameters
         this->declare_parameter<std::string>("odometry_topic_self", "");
         this->declare_parameter<std::string>("odometry_topic_other", "");
-        this->declare_parameter<std::string>("hazard_detection_topic", "");
+        this->declare_parameter<int>("seed", 42);
         this->declare_parameter<std::string>("cmd_vel_topic", "");
         this->declare_parameter<double>("initial_x_self", 0.0);
         this->declare_parameter<double>("initial_y_self", 0.0);
@@ -42,56 +63,54 @@ public:
         this->declare_parameter<double>("initial_y_other", 0.0);
         this->declare_parameter<double>("initial_yaw_other", 0.0);
 
-        this->get_parameter("odometry_topic_self", odometry_topic_self);
-        this->get_parameter("odometry_topic_other", odometry_topic_other);
-        this->get_parameter("hazard_detection_topic", hazard_detection_topic);
-        this->get_parameter("cmd_vel_topic", cmd_vel_topic);
-        this->get_parameter("initial_x_self", initial_x_self);
-        this->get_parameter("initial_y_self", initial_y_self);
-        this->get_parameter("initial_yaw_self", initial_yaw_self);
-        this->get_parameter("initial_x_other", initial_x_other);
-        this->get_parameter("initial_y_other", initial_y_other);
-        this->get_parameter("initial_yaw_other", initial_yaw_other);
+        this->get_parameter("odometry_topic_self", odometry_topic_self_);
+        this->get_parameter("odometry_topic_other", odometry_topic_other_);
+        this->get_parameter("seed", seed_);
+        this->get_parameter("cmd_vel_topic", cmd_vel_topic_);
+        this->get_parameter("initial_x_self", initial_x_self_);
+        this->get_parameter("initial_y_self", initial_y_self_);
+        this->get_parameter("initial_yaw_self", initial_yaw_self_);
+        this->get_parameter("initial_x_other", initial_x_other_);
+        this->get_parameter("initial_y_other", initial_y_other_);
+        this->get_parameter("initial_yaw_other", initial_yaw_other_);
 
         // Subscribe to the robot's odometry topic
         odometry_subscription_self_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            odometry_topic_self, 1,
+            odometry_topic_self_, 1,
             std::bind(&RobotNav::odometry_callback_self, this, std::placeholders::_1));
 
-        // Subscrine to the other robot's odometry topic
+        // Subscribe to the other robot's odometry topic
         odometry_subscription_other_ = this->create_subscription<nav_msgs::msg::Odometry>(
-            odometry_topic_other, 1,
+            odometry_topic_other_, 1,
             std::bind(&RobotNav::odometry_callback_other, this, std::placeholders::_1));
 
-        // Subscribe to the robot's hazard detection topic
-        hazard_detection_subscription_ = this->create_subscription<irobot_create_msgs::msg::HazardDetectionVector>(
-            hazard_detection_topic, 1,
-            std::bind(&RobotNav::hazard_detection_callback, this, std::placeholders::_1));
-
         // Publish the robot's velocity commands
-        cmd_vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic, 1);
+        cmd_vel_publisher_ = this->create_publisher<geometry_msgs::msg::Twist>(cmd_vel_topic_, 1);
 
         // Create a timer to publish the velocity commands
         timer_ = this->create_wall_timer(
-            std::chrono::milliseconds(1000),
+            std::chrono::milliseconds(500),
             std::bind(&RobotNav::publish_velocity, this));
 
         // Initialize gloabl variables
-        behavior_state = BehaviorState::FORWARD;
-        x_self_ = initial_x_self;
-        y_self_ = initial_y_self;
-        yaw_self_ = initial_yaw_self;
+        position_self_ = {initial_x_self_, initial_y_self_, initial_yaw_self_};
+        position_other_ = {initial_x_other_, initial_y_other_, initial_yaw_other_};
+        avoidance_mode_ = false;
+        behavior_state_ = BehaviorState::IDLE;
+
+        // Set the random seed
+        srand(seed_);
 
         // Log the initial global positions and orientations
         RCLCPP_INFO(
             this->get_logger(), 
             "Initial global position of robot_self: x = %f, y = %f, yaw = %f radians",
-            initial_x_self, initial_y_self, initial_yaw_self);
+            position_self_.x, position_self_.y, position_self_.yaw);
 
-        RCLCPP_INFO(
+        RCLCPP_DEBUG(
             this->get_logger(),
             "Initial global position of robot_other: x = %f, y = %f, yaw = %f radians",
-            initial_x_other, initial_y_other, initial_yaw_other);
+            position_other_.x, position_other_.y, position_other_.yaw);
     }
 
 private:
@@ -103,18 +122,15 @@ private:
      */
     void odometry_callback_self(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        yaw_self_old_ = yaw_self_;
+        position_self_.x = initial_x_self_ + msg->pose.pose.position.x;
+        position_self_.y = initial_y_self_ + msg->pose.pose.position.y;
+        position_self_.yaw = quaternion_to_yaw(msg->pose.pose.orientation);
+        position_self_.yaw = normalize_angle(position_self_.yaw);
 
-        x_self_ = initial_x_self + msg->pose.pose.position.x;
-        y_self_ = initial_y_self + msg->pose.pose.position.y;
-        yaw_self_ = quaternion_to_yaw(msg->pose.pose.orientation);
-        yaw_self_ = normalize_angle(yaw_self_);
-        
-
-        RCLCPP_INFO(
+        RCLCPP_DEBUG(
             this->get_logger(),
             "Global position of robot_self: x = %f, y = %f, yaw = %f radians",
-            x_self_, y_self_, yaw_self_);
+            position_self_.x, position_self_.y, position_self_.yaw);
     }
 
     /**
@@ -125,54 +141,96 @@ private:
      */
     void odometry_callback_other(const nav_msgs::msg::Odometry::SharedPtr msg)
     {
-        x_other_ = initial_x_other + msg->pose.pose.position.x;
-        y_other_ = initial_y_other + msg->pose.pose.position.y;
-        yaw_other_ = quaternion_to_yaw(msg->pose.pose.orientation);
-        yaw_other_ = normalize_angle(yaw_other_);
+        position_other_.x = initial_x_other_ + msg->pose.pose.position.x;
+        position_other_.y = initial_y_other_ + msg->pose.pose.position.y;
+        position_other_.yaw = quaternion_to_yaw(msg->pose.pose.orientation);
+        position_other_.yaw = normalize_angle(position_other_.yaw);
 
-        RCLCPP_INFO(
+        RCLCPP_DEBUG(
             this->get_logger(),
             "Global position of robot_other: x = %f, y = %f, yaw = %f radians",
-            x_other_, y_other_, yaw_other_);
+            position_other_.x, position_other_.y, position_other_.yaw);
 
+        // Check if the other robot is too close
+        if (std::pow(std::pow(position_other_.x - position_self_.x, 2) + 
+            std::pow(position_other_.y - position_self_.y, 2), 0.5) < 1.0 && avoidance_mode_ == false) {
+            avoidance_mode_ = true;
 
-        // // Check if the other robot is too close (FEATURE NOT WARKING YET)
-        // if (std::pow(std::pow(x_self_ - x_other_, 2) + std::pow(y_self_ - y_other_, 2), 0.5) < 1.0) {
-
-        //     if (last_action_was_rotation) {
-        //         yaw_goal = 0.0;
-        //         last_action_was_rotation = false;
-        //     }
-        //     else {
-        //         yaw_goal = M_PI;
-        //         last_action_was_rotation = true;
-        //     }
-
-        //     RCLCPP_INFO(
-        //         this->get_logger(),
-        //         "Robot_other is too close! The robot_self should rotate 180 degrees");
-        // }
+            RCLCPP_DEBUG(
+                this->get_logger(),
+                "Robot_other is too close! Avoidance mode activated.");
+        }
+        else {
+            avoidance_mode_ = false;
+        }
     }
 
     /**
-     * @brief Callback function for the robot's hazard detection topic (NOT WORKING YET - FIX THE HAZARD DETECTION TOPIC)
-     * @details The robot's behavior is updated based on the detected hazards.
-     *          If a bump is detected, the robot should rotate. This function works only for one robot, however the second 
-     *          one is not working yet (namespace issue ?).
+     * @brief Select the robot's behavior based on the other robot's position
+     * @details The robot's behavior is based on the other robot's position and orientation
      * 
-     * @param[in] msg 
+     * @return BehaviorState 
      */
-    void hazard_detection_callback(const irobot_create_msgs::msg::HazardDetectionVector::SharedPtr msg) {
-        for (const auto& detection : msg->detections) {
-            if (detection.type == irobot_create_msgs::msg::HazardDetection::BUMP) {
-
-                behavior_state = BehaviorState::ROTATING;
-
-                RCLCPP_INFO(this->get_logger(),
-                            "Bump detected! The robot_self should rotate 180 degrees.");
-                break;
+    BehaviorState behaviour_selector()
+    {
+        if (!avoidance_mode_)
+        {
+            // Check if the robot is close to the limits of the environment
+            // If the robot is close to the limits, the robot should rotate
+            if (position_self_.x >= LIMIT_X || position_self_.x <= -LIMIT_X || 
+                position_self_.y >= LIMIT_Y || position_self_.y <= -LIMIT_Y)
+            {
+                if (position_self_.x >= LIMIT_X && (position_self_.yaw >= 3 * M_PI / 2 || position_self_.yaw <= M_PI / 2)) {
+                    return BehaviorState::ROTATING_RIGHT;
+                }
+                else if (position_self_.x <= -LIMIT_X && (position_self_.yaw >= M_PI / 2 && position_self_.yaw <= 3 * M_PI / 2)) {
+                    return BehaviorState::ROTATING_RIGHT;
+                }
+                else if (position_self_.y >= LIMIT_Y && position_self_.yaw <= M_PI) {
+                    return BehaviorState::ROTATING_RIGHT;
+                }
+                else if (position_self_.y <= -LIMIT_Y && position_self_.yaw >= M_PI) {
+                    return BehaviorState::ROTATING_RIGHT;
+                }
+                else {
+                    return BehaviorState::FORWARD;
+                }
+            } 
+            else {
+                // compute a random number between 0 and 1 more based on a random seed_ and more likely to be 1
+                double random_number = (double)rand() / RAND_MAX;
+                if (random_number > 0.75) {
+                    return BehaviorState::ROTATING_RIGHT;
+                } 
+                else if (random_number < 0.15) {
+                    return BehaviorState::ROTATING_LEFT;
+                }
+                else {
+                    return BehaviorState::FORWARD;
+                }
             }
         }
+        else
+        {
+            // compute the angle between the two robots
+            double angle = atan2(position_other_.y - position_self_.y, position_other_.x - position_self_.x);
+            angle = normalize_angle(angle);
+
+            // compute the angle between the robot's orientation and the angle between the two robots
+            double angle_diff = normalize_angle(angle - position_self_.yaw);
+
+            // avoidance of the other robot
+            if (angle_diff < M_PI / 2) {
+                return BehaviorState::ROTATING_RIGHT;
+            }
+            else if (angle_diff > 3 * M_PI / 2) {
+                return BehaviorState::ROTATING_LEFT;
+            }
+            else {
+                return BehaviorState::FORWARD;
+            }
+        }
+        return BehaviorState::IDLE;
     }
 
     /**
@@ -181,19 +239,26 @@ private:
      */
     void publish_velocity()
     {
-        double x_speed;
-        double yaw_speed;
+        double x_speed, yaw_speed;
+
+        behavior_state_ = behaviour_selector();
 
         // Robot is going forward
-        if (behavior_state == BehaviorState::FORWARD) {
+        if (behavior_state_ == BehaviorState::FORWARD) {
             x_speed = 1.0;
             yaw_speed = 0.0;
         }
-        // Robot is rotating
-        else if (behavior_state == BehaviorState::ROTATING) {
+        // Robot is ROTATING_RIGHT
+        else if (behavior_state_ == BehaviorState::ROTATING_RIGHT) {
+            x_speed = 0.0;
+            yaw_speed = -1.0;
+            behavior_state_ = BehaviorState::FORWARD;
+        }
+        // Robot is ROTATING_LEFT
+        else if (behavior_state_ == BehaviorState::ROTATING_LEFT) {
             x_speed = 0.0;
             yaw_speed = 1.0;
-            behavior_state = BehaviorState::FORWARD;
+            behavior_state_ = BehaviorState::FORWARD;
         }
         // Robot is idle
         else {
@@ -201,10 +266,10 @@ private:
             yaw_speed = 0.0;
         }
 
-        RCLCPP_INFO(
+        RCLCPP_DEBUG(
             this->get_logger(),
-            "x_speed = %f, yaw_speed = %f",
-            x_speed, yaw_speed);
+            "Robot's behavior: %d, x_speed = %f, yaw_speed = %f",
+            (int)behavior_state_, x_speed, yaw_speed);
 
         // Publish the velocity commands
         auto msg = geometry_msgs::msg::Twist();
@@ -242,18 +307,17 @@ private:
     // Declare the subscribers, publishers and the timer
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscription_self_;
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odometry_subscription_other_;
-    rclcpp::Subscription<irobot_create_msgs::msg::HazardDetectionVector>::SharedPtr hazard_detection_subscription_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_publisher_;
     rclcpp::TimerBase::SharedPtr timer_;
 
-    // Retrieve the parameter values
-    std::string odometry_topic_self, odometry_topic_other, hazard_detection_topic, cmd_vel_topic;
-    double initial_x_self, initial_y_self, initial_yaw_self, initial_x_other, initial_y_other, initial_yaw_other;
-
-    // Declare the global variables
-    enum BehaviorState behavior_state;
-    double x_self_, y_self_, yaw_self_, yaw_self_old_; 
-    double x_other_, y_other_, yaw_other_;
+    // Declare the variables
+    std::string odometry_topic_self_, odometry_topic_other_, cmd_vel_topic_;
+    double initial_x_self_, initial_y_self_, initial_yaw_self_;
+    double initial_x_other_, initial_y_other_, initial_yaw_other_;
+    BehaviorState behavior_state_;
+    Position position_self_, position_other_;
+    bool avoidance_mode_;
+    int seed_;
 };
 
 /**
