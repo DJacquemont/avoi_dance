@@ -18,7 +18,7 @@ The system's localization of the robots within the global frame relies exclusive
 The algorithm is based on the following steps:
 
 <p align="center">
-  <img src="images/algorithm_diagram.png" width="40%" />
+  <img src="images/algorithm_diagram.png" width="50%" />
   <br>
   Algorithm High Level Diagram
 </p>
@@ -34,7 +34,7 @@ While working on the project, I encountered several challenges that present oppo
 * To know the exact position of the robots, the /odom topic was used. Unfortunatly, the odometry data is not always accurate, and the robots' positions can drift over time. This issue can be addressed by using a more accurate localization system, such as SLAM or sensor fusion (with GPS sensor data for instance).
 
 <p align="center">
-  <img src="images/node_graph.png" width="70%" />
+  <img src="images/node_graph.png" width="80%" />
   <br>
   Node Graph of the Systems
 </p>
