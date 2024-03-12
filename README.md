@@ -23,7 +23,7 @@ The algorithm is based on the following steps:
   Algorithm High Level Diagram
 </p>
 
-The node subscribes to the odometry data of both robots and calculates the distance between them. If the distance is less than a specified threshold and the robot faces the other robot, the node publishes a command to the robots to steer away. If the robot is outside of the perimeter the node publishes a command to the robot to steer back inside the perimeter. Most of the time, the robots are commanded to randomly move around in perimeter.
+The node subscribes to the odometry data of both robots and calculates the distance between them. If the distance is less than a specified threshold and the robot faces the other robot, the node publishes a command to the robots to steer away. If the robot is outside of the perimeter the node publishes a command to the robot to steer back inside the perimeter. Most of the time, the robots are commanded to randomly move around in the perimeter.
 
 ### Challenges & Possible Improvements
 
